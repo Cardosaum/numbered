@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.1](https://github.com/Cardosaum/numbered/compare/numbered-macros-v0.1.0...numbered-macros-v0.1.1) - 2026-08-16
+
+### Other
+
+- Put tables on Variants and stop implementing Display
+
 ### Changed
 
 - emit `VARIANTS` / `NUMBERS` on `numbered::Variants`, not as inherent items
