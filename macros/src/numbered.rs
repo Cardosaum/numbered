@@ -293,9 +293,26 @@ struct NumberedVariant<'a> {
     ident: &'a Ident,
     number: i128,
     span: Span,
+    fields: &'a Fields,
 }
 
-fn unit_variants(input: &DeriveInput) -> Result<Vec<&syn::Variant>> {
+fn ignore_pat(ident: &Ident, fields: &Fields) -> TokenStream {
+    match fields {
+        Fields::Unit => quote! { Self::#ident },
+        Fields::Named(_) => quote! { Self::#ident { .. } },
+        Fields::Unnamed(_) => quote! { Self::#ident(..) },
+    }
+}
+
+fn has_payload(fields: &Fields) -> bool {
+    match fields {
+        Fields::Unit => false,
+        Fields::Named(n) => !n.named.is_empty(),
+        Fields::Unnamed(u) => !u.unnamed.is_empty(),
+    }
+}
+
+fn enum_variants(input: &DeriveInput) -> Result<Vec<&syn::Variant>> {
     let Data::Enum(data) = &input.data else {
         return Err(syn::Error::new(
             input.ident.span(),
@@ -305,12 +322,6 @@ fn unit_variants(input: &DeriveInput) -> Result<Vec<&syn::Variant>> {
 
     let mut variants = Vec::with_capacity(data.variants.len());
     for variant in &data.variants {
-        if !matches!(variant.fields, Fields::Unit) {
-            return Err(syn::Error::new(
-                variant.span(),
-                "Numbered only supports unit variants (no fields)",
-            ));
-        }
         variants.push(variant);
     }
     if variants.is_empty() {
@@ -379,6 +390,7 @@ fn assign_numbers<'a>(
             ident: &variant.ident,
             number,
             span: variant.ident.span(),
+            fields: &variant.fields,
         });
     }
     Ok(out)
@@ -398,12 +410,13 @@ pub fn derive(input: TokenStream) -> Result<TokenStream> {
         }
     };
 
-    let raw_variants = unit_variants(&input)?;
+    let raw_variants = enum_variants(&input)?;
     let variants = assign_numbers(&raw_variants, attr.repr, attr.start)?;
     let crate_path = &attr.crate_path;
     let repr_ty = attr.repr.ty_tokens();
     let as_method = format_ident!("as_{}", attr.repr.name());
     let from_method = format_ident!("from_{}", attr.repr.name());
+    let fieldless = variants.iter().all(|v| !has_payload(v.fields));
 
     let idents: Vec<&Ident> = variants.iter().map(|v| v.ident).collect();
     let number_lits: Vec<syn::LitInt> = variants
@@ -415,8 +428,8 @@ pub fn derive(input: TokenStream) -> Result<TokenStream> {
         .iter()
         .zip(number_lits.iter())
         .map(|(v, lit)| {
-            let ident = v.ident;
-            quote! { Self::#ident => #lit }
+            let pat = ignore_pat(v.ident, v.fields);
+            quote! { #pat => #lit }
         })
         .collect();
 
@@ -433,18 +446,30 @@ pub fn derive(input: TokenStream) -> Result<TokenStream> {
         .iter()
         .zip(number_lits.iter())
         .map(|(v, lit)| {
-            let ident = v.ident;
-            quote! { Self::#ident => *other == #lit }
+            let pat = ignore_pat(v.ident, v.fields);
+            quote! { #pat => *other == #lit }
         })
         .collect();
 
     let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
 
     let variants_impl = input.generics.params.is_empty().then(|| {
+        let variant_ty_and_table = if fieldless {
+            quote! {
+                type Variant = Self;
+                const VARIANTS: &'static [Self] = &[#(Self::#idents,)*];
+            }
+        } else {
+            let holes = variants.iter().map(|_| quote! { () });
+            quote! {
+                type Variant = ();
+                const VARIANTS: &'static [()] = &[#(#holes,)*];
+            }
+        };
         quote! {
             impl #crate_path::Variants for #name {
                 type Repr = #repr_ty;
-                const VARIANTS: &'static [Self] = &[#(Self::#idents,)*];
+                #variant_ty_and_table
                 const NUMBERS: &'static [Self::Repr] = &[#(#number_lits,)*];
             }
         }
@@ -459,7 +484,7 @@ pub fn derive(input: TokenStream) -> Result<TokenStream> {
         }
     };
 
-    let serde_impls = cfg!(feature = "serde").then(|| {
+    let serde_serialize = cfg!(feature = "serde").then(|| {
         quote! {
             impl #impl_generics #crate_path::__serde::Serialize for #name #ty_generics #where_clause {
                 fn serialize<S: #crate_path::__serde::Serializer>(
@@ -470,7 +495,11 @@ pub fn derive(input: TokenStream) -> Result<TokenStream> {
                     #crate_path::__serde::Serialize::serialize(&n, serializer)
                 }
             }
+        }
+    });
 
+    let serde_deserialize = (fieldless && cfg!(feature = "serde")).then(|| {
+        quote! {
             impl #de_impl_generics #crate_path::__serde::Deserialize<'de> for #name #ty_generics #where_clause {
                 fn deserialize<D: #crate_path::__serde::Deserializer<'de>>(
                     deserializer: D,
@@ -482,24 +511,8 @@ pub fn derive(input: TokenStream) -> Result<TokenStream> {
         }
     });
 
-    Ok(quote! {
-        impl #impl_generics #name #ty_generics #where_clause {
-            /// Stable integer number assigned to this variant.
-            ///
-            /// Overridden by `#[numbered(n = ...)]` or a native discriminant.
-            #[inline]
-            #[must_use]
-            pub const fn number(self) -> #repr_ty {
-                match self { #(#number_arms,)* }
-            }
-
-            /// Alias of [`Self::number`].
-            #[inline]
-            #[must_use]
-            pub const fn #as_method(self) -> #repr_ty {
-                self.number()
-            }
-
+    let parse_impls = fieldless.then(|| {
+        quote! {
             /// Parse a number into `Self`.
             ///
             /// Equivalent to [`TryFrom::try_from`](core::convert::TryFrom).
@@ -521,6 +534,43 @@ pub fn derive(input: TokenStream) -> Result<TokenStream> {
                 Self::from_number(n)
             }
         }
+    });
+
+    let try_from_impl = fieldless.then(|| {
+        quote! {
+            impl #impl_generics ::core::convert::TryFrom<#repr_ty> for #name #ty_generics #where_clause {
+                type Error = #crate_path::FromNumberError<#repr_ty>;
+                #[inline]
+                fn try_from(
+                    n: #repr_ty,
+                ) -> ::core::result::Result<Self, #crate_path::FromNumberError<#repr_ty>> {
+                    Self::from_number(n)
+                }
+            }
+        }
+    });
+
+    Ok(quote! {
+        impl #impl_generics #name #ty_generics #where_clause {
+            /// Stable integer number assigned to this variant.
+            ///
+            /// Overridden by `#[numbered(n = ...)]` or a native discriminant.
+            /// Takes `&self` so variants with a payload do not need `Copy`.
+            #[inline]
+            #[must_use]
+            pub const fn number(&self) -> #repr_ty {
+                match self { #(#number_arms,)* }
+            }
+
+            /// Alias of [`Self::number`].
+            #[inline]
+            #[must_use]
+            pub const fn #as_method(&self) -> #repr_ty {
+                self.number()
+            }
+
+            #parse_impls
+        }
 
         #variants_impl
 
@@ -531,15 +581,7 @@ pub fn derive(input: TokenStream) -> Result<TokenStream> {
             }
         }
 
-        impl #impl_generics ::core::convert::TryFrom<#repr_ty> for #name #ty_generics #where_clause {
-            type Error = #crate_path::FromNumberError<#repr_ty>;
-            #[inline]
-            fn try_from(
-                n: #repr_ty,
-            ) -> ::core::result::Result<Self, #crate_path::FromNumberError<#repr_ty>> {
-                Self::from_number(n)
-            }
-        }
+        #try_from_impl
 
         impl #impl_generics ::core::cmp::PartialEq<#repr_ty> for #name #ty_generics #where_clause {
             #[inline]
@@ -555,7 +597,8 @@ pub fn derive(input: TokenStream) -> Result<TokenStream> {
             }
         }
 
-        #serde_impls
+        #serde_serialize
+        #serde_deserialize
     })
 }
 
@@ -643,20 +686,19 @@ mod tests {
             },
             "Numbered enum must have at least one variant",
         );
-        assert_err(
-            quote! {
-                #[numbered(u8)]
-                enum Mode { Unit, WithField(u8) }
-            },
-            "Numbered only supports unit variants (no fields)",
-        );
-        assert_err(
-            quote! {
-                #[numbered(u8)]
-                enum Mode { Named { x: u8 } }
-            },
-            "Numbered only supports unit variants (no fields)",
-        );
+        let fielded = ok(quote! {
+            #[numbered(u8, start = 1)]
+            enum HostError {
+                Unsupported { capability: &'static str },
+                OpenFailed { cause: String },
+                BadRequest { why: &'static str },
+                Io { status: String },
+            }
+        });
+        assert!(fielded.contains("number"));
+        assert!(fielded.contains("Variant = ()"));
+        assert!(!fielded.contains("from_number"));
+        assert!(fielded.contains("NUMBERS"));
         assert_err(
             quote! { enum Mode { A } },
             "missing #[numbered(<repr>)] container attribute",

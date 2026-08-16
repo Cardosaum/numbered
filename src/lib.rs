@@ -1,4 +1,4 @@
-//! Compile-time integer numbers for unit-like enum variants.
+//! Compile-time integer numbers for enum variants.
 //!
 //! This crate gives each variant a stable integer: a `u8` (or another chosen
 //! repr) assigned at compile time. Conversion is a `match` on a literal.
@@ -70,23 +70,48 @@
 //! assert_eq!(Wire::from_number(21).unwrap(), Wire::Draining);
 //! ```
 //!
-//! Violations (non-enum, fields, empty enum, missing repr, duplicate keys,
-//! unknown keys, collisions, overflow, disagreeing discriminant) are
-//! compile errors.
+//! Fielded variants keep `number()` and the [`Variants`] tables. Pair with
+//! cognomen `reason = "... {field}"` on the same enum; a number cannot
+//! rebuild the payload, so `from_number` is omitted.
+//!
+//! ```
+//! use numbered::{Numbered, Variants};
+//!
+//! #[derive(Debug, Clone, PartialEq, Numbered)]
+//! #[numbered(u8, start = 1)]
+//! enum HostError {
+//!     Unsupported { capability: &'static str },
+//!     OpenFailed { cause: &'static str },
+//! }
+//!
+//! let e = HostError::OpenFailed { cause: "busy" };
+//! assert_eq!(e.number(), 2);
+//! assert_eq!(HostError::NUMBERS, &[1, 2]);
+//! assert_eq!(HostError::VARIANTS.len(), 2);
+//! assert_eq!(HostError::COUNT, 2);
+//! ```
+//!
+//! Violations (non-enum, empty enum, missing repr, duplicate keys, unknown
+//! keys, collisions, overflow, disagreeing discriminant) are compile errors.
 //!
 //! # Generated API
 //!
 //! For `#[numbered(u8)]` on `E`:
 //!
-//! - `number()` / `as_u8()` -> `u8` (`as_*` follows the repr)
+//! - `number()` / `as_u8()` -> `u8` (`as_*` follows the repr). Takes `&self`
+//!   so fielded variants do not need `Copy` (same shape as cognomen extras)
 //! - `from_number` / `from_u8` -> `Result<Self, FromNumberError<u8>>`
-//! - [`Variants`] (non-generic enums): `E::VARIANTS` and `E::NUMBERS` after
-//!   `use numbered::Variants`. These are trait items, so they cannot clash
-//!   with another derive or a user `const VARIANTS`.
+//!   (fieldless enums; a number cannot rebuild a payload)
+//! - [`Variants`] (non-generic enums): `E::VARIANTS`, `E::NUMBERS`, and
+//!   `E::COUNT` after `use numbered::Variants`. Trait items, so they cannot
+//!   clash with cognomen or a user `const VARIANTS`. Fielded enums keep
+//!   `NUMBERS` / `COUNT`; `VARIANTS` is `&[()]` of that length
 //! - No `Display` impl. Print the number with `e.number()`.
-//! - `From<E> for u8`, `TryFrom<u8> for E`
+//! - `From<E> for u8`, `TryFrom<u8> for E` (`TryFrom` is fieldless only)
 //! - `PartialEq<u8>` / `PartialEq<E>` both ways
-//! - `Serialize` / `Deserialize` (feature `serde`): the number, not a string
+//! - `Serialize` / `Deserialize` (feature `serde`): the number, not a string.
+//!   `Deserialize` is fieldless only. Do not enable serde on both Numbered
+//!   and Cognomen for the same type (two `Serialize` impls)
 //!
 //! # Features
 //!
@@ -125,10 +150,13 @@ pub use numbered_macros::Numbered;
 
 /// Declaration-order tables for a non-generic numbered enum.
 ///
-/// `VARIANTS` and `NUMBERS` live on this trait, not as inherent items on
-/// `E`. Another derive, or a user `const VARIANTS`, cannot clash with them.
-/// Import the trait to use `E::VARIANTS`, or spell the path:
-/// `<E as numbered::Variants>::VARIANTS`.
+/// `VARIANTS`, `NUMBERS`, and `COUNT` live on this trait, not as inherent
+/// items on `E`. Cognomen's `Variants` is a different trait; import one
+/// or spell the path: `<E as numbered::Variants>::NUMBERS`.
+///
+/// Fieldless enums store `Self` in [`VARIANTS`]. Fielded enums cannot
+/// build a `'static [Self]`, so [`Variant`](Self::Variant) is `()` and
+/// `VARIANTS.len()` / [`COUNT`](Self::COUNT) still match the declaration.
 ///
 /// ```
 /// use numbered::{Numbered, Variants};
@@ -142,16 +170,26 @@ pub use numbered_macros::Numbered;
 ///
 /// assert_eq!(Kind::VARIANTS, &[Kind::A, Kind::B]);
 /// assert_eq!(Kind::NUMBERS, &[0, 1]);
+/// assert_eq!(Kind::COUNT, 2);
 /// ```
 pub trait Variants: Sized + 'static {
     /// Integer type chosen in `#[numbered(<repr>)]`.
     type Repr: Copy;
 
-    /// All variants in declaration order.
-    const VARIANTS: &'static [Self];
+    /// Element type of [`VARIANTS`].
+    ///
+    /// `Self` when every variant is fieldless; `()` when any variant has
+    /// a payload (`VARIANTS` is then a length-only table).
+    type Variant: 'static;
+
+    /// All variants in declaration order, or `()` placeholders if fielded.
+    const VARIANTS: &'static [Self::Variant];
 
     /// Assigned number for each variant in declaration order.
     const NUMBERS: &'static [Self::Repr];
+
+    /// How many variants were declared (`NUMBERS.len()`).
+    const COUNT: usize = Self::NUMBERS.len();
 }
 
 /// Error returned when a number matches no declared variant.
@@ -233,9 +271,42 @@ mod tests {
             &[Kind::Process, Kind::File, Kind::Network, Kind::Socket]
         );
         assert_eq!(Kind::NUMBERS, &[0, 1, 10, 11]);
+        assert_eq!(Kind::COUNT, 4);
         assert_eq!(Kind::Process.number().to_string(), "0");
         assert_eq!(u8::from(Kind::File), 1);
         assert_eq!(Kind::from_u8(11).unwrap(), Kind::Socket);
+    }
+
+    #[derive(Debug, Clone, PartialEq, Eq, Numbered)]
+    #[numbered(u8, start = 1)]
+    enum HostError {
+        Unsupported { capability: &'static str },
+        OpenFailed { cause: &'static str },
+        BadRequest { why: &'static str },
+        Io { status: &'static str },
+    }
+
+    #[test]
+    fn fielded_numbers_and_tables() {
+        let e = HostError::OpenFailed { cause: "busy" };
+        assert_eq!(e.number(), 2);
+        assert_eq!(e.as_u8(), 2);
+        assert_eq!(u8::from(e.clone()), 2);
+        assert!(e == 2u8);
+        assert!(2u8 == e);
+        assert_eq!(<HostError as Variants>::NUMBERS, &[1, 2, 3, 4]);
+        assert_eq!(<HostError as Variants>::VARIANTS.len(), 4);
+        assert_eq!(HostError::COUNT, 4);
+        assert_eq!(HostError::COUNT, HostError::VARIANTS.len());
+        assert_eq!(HostError::Unsupported { capability: "x" }.number(), 1);
+        assert_eq!(
+            HostError::BadRequest {
+                why: "device name has interior NUL"
+            }
+            .number(),
+            3
+        );
+        assert_eq!(HostError::Io { status: "e" }.number(), 4);
     }
 
     #[test]

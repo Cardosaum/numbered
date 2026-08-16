@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- fielded variants and `Variants::Variant` / `COUNT` so tables work next to
+  cognomen extras
+
+### Changed
+
+- `number` / `as_*` take `&self`
+- omit `from_number` / `TryFrom` / serde `Deserialize` when a variant has
+  a payload
+
 ## [0.2.0](https://github.com/Cardosaum/numbered/releases/tag/numbered-macros-v0.2.0) - 2026-08-16
 
 ### Changed

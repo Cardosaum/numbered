@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- fielded variants: `number(&self)` ignores the payload; `Variants::NUMBERS`
+  and `COUNT` stay available; `VARIANTS` is `&[()]` of that length
+- `Variants::COUNT` (`NUMBERS.len()`) and `Variants::Variant`
+
+### Changed
+
+- `number` / `as_*` take `&self` so non-`Copy` payloads work next to cognomen
+- `from_number`, `TryFrom`, and serde `Deserialize` are omitted when any
+  variant has a payload (a number cannot reconstruct fields)
+
 ## [0.2.0](https://github.com/Cardosaum/numbered/releases/tag/numbered-v0.2.0) - 2026-08-16
 
 ### Changed
