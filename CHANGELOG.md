@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0](https://github.com/Cardosaum/numbered/compare/numbered-v0.2.0...numbered-v0.3.0) - 2026-08-16
+
+### Added
+
+- number fielded variants without requiring Copy ([#4](https://github.com/Cardosaum/numbered/pull/4))
+
 ### Added
 
 - fielded variants: `number(&self)` ignores the payload; `Variants::NUMBERS`
