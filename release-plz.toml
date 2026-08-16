@@ -1,0 +1,18 @@
+[workspace]
+repo_url = "https://github.com/Cardosaum/numbered"
+pr_labels = ["release"]
+# Publish when the release PR is merged, not on every main commit.
+release_always = false
+
+[[package]]
+name = "numbered"
+version_group = "numbered"
+changelog_include = ["numbered-macros"]
+changelog_path = "CHANGELOG.md"
+
+[[package]]
+name = "numbered-macros"
+version_group = "numbered"
+changelog_path = "macros/CHANGELOG.md"
+# cargo-semver-checks does not apply to proc-macro crates.
+semver_check = false

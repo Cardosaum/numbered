@@ -1,0 +1,5 @@
+error: duplicate numbered start
+ --> tests/ui/fail_duplicate_key.rs:4:27
+  |
+4 | #[numbered(u8, start = 1, start = 2)]
+  |                           ^^^^^

@@ -1,0 +1,5 @@
+error: number 256 does not fit in u8
+ --> tests/ui/fail_number_overflow.rs:6:20
+  |
+6 |     #[numbered(n = 256)]
+  |                    ^^^

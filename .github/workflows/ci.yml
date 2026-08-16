@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    name: test (stable)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo test --workspace --all-targets
+      - run: cargo test --workspace --all-features
+      - run: cargo test --workspace --no-default-features --all-targets
+      - run: cargo test --workspace --no-default-features --features alloc --all-targets
+
+  lint:
+    name: clippy + fmt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo fmt --all -- --check
+      - run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+      - run: cargo clippy --workspace --all-targets --no-default-features -- -D warnings
+      # numbered package needs numbered-macros on crates.io; add after first publish.
+      - run: cargo package -p numbered-macros --no-verify
+
+  hygiene:
+    name: source hygiene (ast-grep ascii)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: cargo-bins/cargo-binstall@main
+      - run: cargo binstall -y ast-grep
+      - run: ast-grep test -c ast-grep/sgconfig.yml
+      - run: ast-grep scan -c ast-grep/sgconfig.yml
+
+  msrv:
+    name: msrv (1.71.1)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.71.1
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo +1.71.1 check --workspace --all-features
+      - run: cargo +1.71.1 check --workspace --no-default-features

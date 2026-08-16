@@ -1,0 +1,20 @@
+id: ascii-only
+valid:
+  - |
+    pub fn number(self) -> u8 {
+        0
+    }
+  - |
+    // pure ascii comment; -- dashes are fine
+    enum Kind {
+        Process,
+        File,
+    }
+invalid:
+  - |
+    // café in a comment
+    enum Mode { Alpha }
+  - |
+    fn grüßen() {}
+  - |
+    const GREETING: &str = "héllo";

@@ -1,0 +1,5 @@
+error: duplicate #[numbered(...)] attribute
+ --> tests/ui/fail_duplicate_attr.rs:5:1
+  |
+5 | #[numbered(u16)]
+  | ^

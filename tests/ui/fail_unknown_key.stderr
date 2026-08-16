@@ -1,0 +1,5 @@
+error: unknown numbered key `rename`
+ --> tests/ui/fail_unknown_key.rs:4:16
+  |
+4 | #[numbered(u8, rename = "x")]
+  |                ^^^^^^

@@ -1,0 +1,5 @@
+error: missing #[numbered(<repr>)] container attribute (e.g. #[numbered(u8)])
+ --> tests/ui/fail_missing_attr.rs:4:6
+  |
+4 | enum Mode {
+  |      ^^^^

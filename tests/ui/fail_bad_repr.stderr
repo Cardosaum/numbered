@@ -1,0 +1,5 @@
+error: unknown numbered repr type `f32`; expected u8|u16|u32|u64|usize|i8|i16|i32|i64|isize
+ --> tests/ui/fail_bad_repr.rs:4:12
+  |
+4 | #[numbered(f32)]
+  |            ^^^

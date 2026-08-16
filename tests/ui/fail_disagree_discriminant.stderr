@@ -1,0 +1,5 @@
+error: #[numbered(n = 5)] disagrees with discriminant 3
+ --> tests/ui/fail_disagree_discriminant.rs:6:20
+  |
+6 |     #[numbered(n = 5)]
+  |                    ^
