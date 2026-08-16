@@ -92,6 +92,8 @@ struct NumberedAttr {
     repr: ReprType,
     start: i128,
     crate_path: syn::Path,
+    no_display: bool,
+    no_variants: bool,
 }
 
 fn set_once<T>(slot: &mut Option<T>, value: T, span: Span, msg: &str) -> Result<()> {
@@ -140,6 +142,8 @@ impl Parse for NumberedAttr {
         let mut repr = None;
         let mut start = None;
         let mut crate_path = None;
+        let mut no_display = None;
+        let mut no_variants = None;
 
         while !input.is_empty() {
             if input.peek(Token![crate]) && input.peek2(Token![=]) {
@@ -173,13 +177,29 @@ impl Parse for NumberedAttr {
                     ));
                 }
             } else if input.peek(syn::Ident) {
-                let ty: Ident = input.parse()?;
-                set_once(
-                    &mut repr,
-                    parse_repr_ident(&ty)?,
-                    ty.span(),
-                    "duplicate numbered repr",
-                )?;
+                let ident: Ident = input.parse()?;
+                if ident == "no_display" {
+                    set_once(
+                        &mut no_display,
+                        true,
+                        ident.span(),
+                        "duplicate numbered no_display",
+                    )?;
+                } else if ident == "no_variants" {
+                    set_once(
+                        &mut no_variants,
+                        true,
+                        ident.span(),
+                        "duplicate numbered no_variants",
+                    )?;
+                } else {
+                    set_once(
+                        &mut repr,
+                        parse_repr_ident(&ident)?,
+                        ident.span(),
+                        "duplicate numbered repr",
+                    )?;
+                }
             } else {
                 return Err(syn::Error::new(
                     input.span(),
@@ -200,6 +220,8 @@ impl Parse for NumberedAttr {
             repr,
             start: start.unwrap_or(0),
             crate_path: crate_path.unwrap_or_else(|| syn::parse_quote!(::numbered)),
+            no_display: no_display.unwrap_or(false),
+            no_variants: no_variants.unwrap_or(false),
         })
     }
 }
@@ -440,13 +462,29 @@ pub fn derive(input: TokenStream) -> Result<TokenStream> {
 
     let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
 
-    let variants_const = input.generics.params.is_empty().then(|| {
+    let variants_const = (input.generics.params.is_empty() && !attr.no_variants).then(|| {
         quote! {
             /// All variants in declaration order.
             pub const VARIANTS: &'static [Self] = &[#(Self::#idents,)*];
+        }
+    });
 
+    let numbers_const = input.generics.params.is_empty().then(|| {
+        quote! {
             /// [`Self::number`] for each variant in declaration order.
             pub const NUMBERS: &'static [#repr_ty] = &[#(#number_lits,)*];
+        }
+    });
+
+    let display_impl = (!attr.no_display).then(|| {
+        quote! {
+            impl #impl_generics ::core::fmt::Display for #name #ty_generics #where_clause {
+                #[inline]
+                fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+                    let n = match self { #(#number_arms,)* };
+                    ::core::fmt::Display::fmt(&n, f)
+                }
+            }
         }
     });
 
@@ -476,6 +514,7 @@ pub fn derive(input: TokenStream) -> Result<TokenStream> {
     Ok(quote! {
         impl #impl_generics #name #ty_generics #where_clause {
             #variants_const
+            #numbers_const
 
             /// Stable integer number assigned to this variant.
             ///
@@ -515,13 +554,7 @@ pub fn derive(input: TokenStream) -> Result<TokenStream> {
             }
         }
 
-        impl #impl_generics ::core::fmt::Display for #name #ty_generics #where_clause {
-            #[inline]
-            fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-                let n = match self { #(#number_arms,)* };
-                ::core::fmt::Display::fmt(&n, f)
-            }
-        }
+        #display_impl
 
         impl #impl_generics ::core::convert::From<#name #ty_generics> for #repr_ty #where_clause {
             #[inline]
@@ -533,7 +566,9 @@ pub fn derive(input: TokenStream) -> Result<TokenStream> {
         impl #impl_generics ::core::convert::TryFrom<#repr_ty> for #name #ty_generics #where_clause {
             type Error = #crate_path::FromNumberError<#repr_ty>;
             #[inline]
-            fn try_from(n: #repr_ty) -> ::core::result::Result<Self, Self::Error> {
+            fn try_from(
+                n: #repr_ty,
+            ) -> ::core::result::Result<Self, #crate_path::FromNumberError<#repr_ty>> {
                 Self::from_number(n)
             }
         }

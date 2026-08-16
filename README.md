@@ -39,7 +39,9 @@ assert_eq!(Kind::NUMBERS, &[0, 1, 10, 11]);
 ```
 
 Native Rust discriminants (`Process = 1`) are treated as `#[numbered(n = 1)]`.
-If both are present they must agree, or the derive is a compile error.
+If both are present they must agree, or the derive is a compile error. A
+variant named `Error` is fine: generated `TryFrom` names `FromNumberError`
+instead of `Self::Error`.
 
 ## Attributes
 
@@ -50,6 +52,8 @@ If both are present they must agree, or the derive is a compile error.
 | `u8` / `u16` / `u32` / `u64` / `usize` / `i8` / `i16` / `i32` / `i64` / `isize` | yes | first positional, or `repr = u8` |
 | `start = 1` | no | first auto-assigned number when no discriminant / `n` is set (default `0`) |
 | `crate = ::other::numbered` | no | path used in generated code when this crate is re-exported |
+| `no_display` | no | skip `Display` so another derive (for example cognomen) can implement it |
+| `no_variants` | no | skip `E::VARIANTS` (`NUMBERS` is still emitted) |
 
 **Variant** (optional): `#[numbered(n = 5)]`
 
@@ -87,8 +91,8 @@ For `#[numbered(u8)]` on `E`:
 |------|--------|
 | `number()` / `as_u8()` | assigned number (`as_*` follows the repr: `as_u16`, `as_i32`, ...) |
 | `from_number` / `from_u8` | `Result<Self, FromNumberError<u8>>` |
-| `E::VARIANTS`, `E::NUMBERS` | declaration order (non-generic enums) |
-| `Display` | decimal number |
+| `E::VARIANTS`, `E::NUMBERS` | declaration order (non-generic enums; `no_variants` skips `VARIANTS`) |
+| `Display` | decimal number (`no_display` skips this) |
 | `From<E> for u8`, `TryFrom<u8> for E` | always; uses `core` |
 | `PartialEq<u8>` both ways | compare a variant against its number |
 | `Serialize` / `Deserialize` | feature `serde`; the number, not a string |

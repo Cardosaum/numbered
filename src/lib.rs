@@ -32,6 +32,8 @@
 //!
 //! Native Rust discriminants (`Process = 1`) are treated as
 //! `#[numbered(n = 1)]`. If both are present they must agree.
+//! A variant named `Error` is fine: generated `TryFrom` names
+//! [`FromNumberError`] instead of `Self::Error`.
 //!
 //! # Attributes
 //!
@@ -43,6 +45,9 @@
 //!   set (default `0`).
 //! - `crate = ::other::numbered`: path used in generated code when this crate
 //!   is re-exported under another name.
+//! - `no_display`: do not implement `Display`. Use this when another derive
+//!   on the same type already implements it (for example cognomen).
+//! - `no_variants`: do not emit `VARIANTS`. `NUMBERS` is still emitted.
 //!
 //! **Variant** (optional): `#[numbered(n = 5)]`
 //!
@@ -79,7 +84,8 @@
 //! - `number()` / `as_u8()` -> `u8` (`as_*` follows the repr)
 //! - `from_number` / `from_u8` -> `Result<Self, FromNumberError<u8>>`
 //! - `E::VARIANTS: &'static [E]` and `E::NUMBERS: &'static [u8]`
-//! - `Display` prints the decimal number
+//!   (`no_variants` skips `VARIANTS`)
+//! - `Display` prints the decimal number (`no_display` skips this)
 //! - `From<E> for u8`, `TryFrom<u8> for E`
 //! - `PartialEq<u8>` / `PartialEq<E>` both ways
 //! - `Serialize` / `Deserialize` (feature `serde`): the number, not a string
@@ -233,6 +239,40 @@ mod tests {
         assert_eq!(Signed::Next.number(), 6);
         assert_eq!(Signed::from_number(-1).unwrap(), Signed::Neg);
         assert_eq!(Signed::NUMBERS, &[-1, 0, 5, 6]);
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Numbered)]
+    #[numbered(u8, no_display, no_variants)]
+    enum Quiet {
+        A,
+        B,
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Numbered)]
+    #[numbered(u8, start = 1)]
+    enum Level {
+        Error,
+        Warn,
+        Info,
+        Debug,
+    }
+
+    #[test]
+    fn error_variant_try_from() {
+        assert_eq!(Level::Error.number(), 1);
+        assert_eq!(Level::try_from(1u8), Ok(Level::Error));
+        assert_eq!(Level::from_number(4).unwrap(), Level::Debug);
+        assert!(Level::from_number(0).is_err());
+        assert_eq!(Level::Error.to_string(), "1");
+    }
+
+    #[test]
+    fn skip_display_and_variants() {
+        assert_eq!(Quiet::A.number(), 0);
+        assert_eq!(Quiet::B.as_u8(), 1);
+        assert_eq!(Quiet::NUMBERS, &[0, 1]);
+        assert_eq!(u8::from(Quiet::B), 1);
+        assert_eq!(Quiet::from_number(0).unwrap(), Quiet::A);
     }
 
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Numbered)]

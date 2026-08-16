@@ -1,0 +1,5 @@
+error: duplicate numbered no_display
+ --> tests/ui/fail_duplicate_no_display.rs:4:28
+  |
+4 | #[numbered(u8, no_display, no_display)]
+  |                            ^^^^^^^^^^

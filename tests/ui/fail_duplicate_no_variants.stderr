@@ -1,0 +1,5 @@
+error: duplicate numbered no_variants
+ --> tests/ui/fail_duplicate_no_variants.rs:4:29
+  |
+4 | #[numbered(u8, no_variants, no_variants)]
+  |                             ^^^^^^^^^^^
