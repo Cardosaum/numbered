@@ -23,6 +23,11 @@ jobs:
         run: |
           set -euo pipefail
           sha=96cf07fe78b9f50c3d600f55c19da42b708b913f
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          notes_from() {
+            awk '/^## \[0.1.0\]/{p=1; next} /^## /{p=0} p' "$1"
+          }
           create() {
             local tag="$1"
             local notes="$2"
@@ -30,10 +35,12 @@ jobs:
               echo "$tag already exists"
               return
             fi
-            gh release create "$tag" --target "$sha" --title "$tag" --notes "$notes"
-          }
-          notes_from() {
-            awk '/^## \[0.1.0\]/{p=1; next} /^## /{p=0} p' "$1"
+            # GITHUB_TOKEN cannot pass --target SHA (cli/cli#9514). Tag first.
+            if ! git rev-parse "$tag" >/dev/null 2>&1; then
+              git tag -a "$tag" "$sha" -m "$tag"
+              git push origin "$tag"
+            fi
+            gh release create "$tag" --title "$tag" --notes "$notes" --verify-tag
           }
           create numbered-macros-v0.1.0 "$(notes_from macros/CHANGELOG.md)"
           create numbered-v0.1.0 "$(notes_from CHANGELOG.md)"
