@@ -1,0 +1,5 @@
+error: missing numbered repr type (e.g. #[numbered(u8)] or #[numbered(repr = u8)])
+ --> tests/ui/fail_empty_attr.rs:4:12
+  |
+4 | #[numbered()]
+  |            ^

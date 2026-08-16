@@ -1,0 +1,7 @@
+error: number -1 does not fit in u8
+ --> tests/ui/fail_negative_u8.rs:3:10
+  |
+3 | #[derive(Numbered)]
+  |          ^^^^^^^^
+  |
+  = note: this error originates in the derive macro `Numbered` (in Nightly builds, run with -Z macro-backtrace for more info)

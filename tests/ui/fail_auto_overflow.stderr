@@ -1,0 +1,5 @@
+error: number 256 does not fit in u8
+ --> tests/ui/fail_auto_overflow.rs:7:5
+  |
+7 |     B,
+  |     ^

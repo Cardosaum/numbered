@@ -1,0 +1,5 @@
+error: missing numbered repr type (e.g. #[numbered(u8)] or #[numbered(repr = u8)])
+ --> tests/ui/fail_start_without_repr.rs:4:21
+  |
+4 | #[numbered(start = 1)]
+  |                     ^

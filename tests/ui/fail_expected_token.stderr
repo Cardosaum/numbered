@@ -1,0 +1,5 @@
+error: expected numbered repr type or key; expected u8|u16|u32|u64|usize|i8|i16|i32|i64|isize
+ --> tests/ui/fail_expected_token.rs:4:12
+  |
+4 | #[numbered(1)]
+  |            ^

@@ -1,0 +1,5 @@
+error: number -1 does not fit in u8
+ --> tests/ui/fail_n_negative_u8.rs:6:20
+  |
+6 |     #[numbered(n = -1)]
+  |                    ^
