@@ -23,9 +23,6 @@ use proc_macro::TokenStream;
 ///   set. Default: `0`.
 /// - `crate = ::path`: crate path emitted in generated code. Default:
 ///   `::numbered`. Set this when you re-export numbered from another crate.
-/// - `no_display`: do not implement `Display`. Use this when another derive
-///   on the same type already implements it (for example cognomen).
-/// - `no_variants`: do not emit `VARIANTS`. `NUMBERS` is still emitted.
 ///
 /// # Variant attribute
 ///
@@ -43,9 +40,8 @@ use proc_macro::TokenStream;
 /// - `const fn as_u8(self) -> <repr>` (name follows the repr)
 /// - `const fn from_number(n: <repr>) -> Result<Self, FromNumberError<repr>>`
 /// - `from_u8` alias matching the repr
-/// - `VARIANTS` / `NUMBERS` (non-generic enums; `no_variants` skips `VARIANTS`)
-/// - `Display` (skipped by `no_display`), `From<Self> for <repr>`,
-///   `TryFrom<repr> for Self`
+/// - `numbered::Variants` (non-generic enums): `VARIANTS` / `NUMBERS`
+/// - `From<Self> for <repr>`, `TryFrom<repr> for Self`
 /// - `PartialEq<repr>` both ways
 /// - `Serialize` / `Deserialize` (feature `serde`)
 ///

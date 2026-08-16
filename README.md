@@ -17,7 +17,7 @@ numbered = "0.1"
 ```
 
 ```rust
-use numbered::Numbered;
+use numbered::{Numbered, Variants};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Numbered)]
 #[numbered(u8)]
@@ -52,8 +52,6 @@ instead of `Self::Error`.
 | `u8` / `u16` / `u32` / `u64` / `usize` / `i8` / `i16` / `i32` / `i64` / `isize` | yes | first positional, or `repr = u8` |
 | `start = 1` | no | first auto-assigned number when no discriminant / `n` is set (default `0`) |
 | `crate = ::other::numbered` | no | path used in generated code when this crate is re-exported |
-| `no_display` | no | skip `Display` so another derive (for example cognomen) can implement it |
-| `no_variants` | no | skip `E::VARIANTS` (`NUMBERS` is still emitted) |
 
 **Variant** (optional): `#[numbered(n = 5)]`
 
@@ -91,8 +89,7 @@ For `#[numbered(u8)]` on `E`:
 |------|--------|
 | `number()` / `as_u8()` | assigned number (`as_*` follows the repr: `as_u16`, `as_i32`, ...) |
 | `from_number` / `from_u8` | `Result<Self, FromNumberError<u8>>` |
-| `E::VARIANTS`, `E::NUMBERS` | declaration order (non-generic enums; `no_variants` skips `VARIANTS`) |
-| `Display` | decimal number (`no_display` skips this) |
+| `Variants` | `E::VARIANTS` / `E::NUMBERS` after `use numbered::Variants` (non-generic). Trait items, so they cannot clash |
 | `From<E> for u8`, `TryFrom<u8> for E` | always; uses `core` |
 | `PartialEq<u8>` both ways | compare a variant against its number |
 | `Serialize` / `Deserialize` | feature `serde`; the number, not a string |
@@ -111,8 +108,8 @@ For `#[numbered(u8)]` on `E`:
 numbered = { version = "0.1", default-features = false }
 ```
 
-Numbers, parse, `Display`, `From` / `TryFrom`, and `VARIANTS` use only
-`core`. Add `features = ["serde"]` for wire formats.
+Numbers, parse, `From` / `TryFrom`, and `Variants` use only `core`. Add
+`features = ["serde"]` for wire formats. Print a number with `e.number()`.
 
 ## MSRV
 

@@ -7,9 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
+### Changed
 
-- `no_display` and `no_variants` so Numbered can share a type with another derive that emits `Display` or `VARIANTS`
+- `VARIANTS` and `NUMBERS` live on the `Variants` trait, not as inherent items, so they cannot clash with another derive or user code
+- Numbered no longer implements `Display`; print `e.number()`
 
 ### Fixed
 

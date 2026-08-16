@@ -9,7 +9,7 @@
 //! # Quick start
 //!
 //! ```
-//! use numbered::Numbered;
+//! use numbered::{Numbered, Variants};
 //!
 //! #[derive(Debug, Clone, Copy, PartialEq, Eq, Numbered)]
 //! #[numbered(u8)]
@@ -45,9 +45,6 @@
 //!   set (default `0`).
 //! - `crate = ::other::numbered`: path used in generated code when this crate
 //!   is re-exported under another name.
-//! - `no_display`: do not implement `Display`. Use this when another derive
-//!   on the same type already implements it (for example cognomen).
-//! - `no_variants`: do not emit `VARIANTS`. `NUMBERS` is still emitted.
 //!
 //! **Variant** (optional): `#[numbered(n = 5)]`
 //!
@@ -83,9 +80,10 @@
 //!
 //! - `number()` / `as_u8()` -> `u8` (`as_*` follows the repr)
 //! - `from_number` / `from_u8` -> `Result<Self, FromNumberError<u8>>`
-//! - `E::VARIANTS: &'static [E]` and `E::NUMBERS: &'static [u8]`
-//!   (`no_variants` skips `VARIANTS`)
-//! - `Display` prints the decimal number (`no_display` skips this)
+//! - [`Variants`] (non-generic enums): `E::VARIANTS` and `E::NUMBERS` after
+//!   `use numbered::Variants`. These are trait items, so they cannot clash
+//!   with another derive or a user `const VARIANTS`.
+//! - No `Display` impl. Print the number with `e.number()`.
 //! - `From<E> for u8`, `TryFrom<u8> for E`
 //! - `PartialEq<u8>` / `PartialEq<E>` both ways
 //! - `Serialize` / `Deserialize` (feature `serde`): the number, not a string
@@ -104,8 +102,8 @@
 //! numbered = { version = "0.1", default-features = false }
 //! ```
 //!
-//! Numbers, parse, `Display`, `From` / `TryFrom`, and `VARIANTS` use only
-//! `core`. Add `features = ["serde"]` for wire formats.
+//! Numbers, parse, `From` / `TryFrom`, and [`Variants`] use only `core`.
+//! Add `features = ["serde"]` for wire formats.
 //!
 //! # MSRV
 //!
@@ -124,6 +122,37 @@ extern crate std;
 
 #[doc(inline)]
 pub use numbered_macros::Numbered;
+
+/// Declaration-order tables for a non-generic numbered enum.
+///
+/// `VARIANTS` and `NUMBERS` live on this trait, not as inherent items on
+/// `E`. Another derive, or a user `const VARIANTS`, cannot clash with them.
+/// Import the trait to use `E::VARIANTS`, or spell the path:
+/// `<E as numbered::Variants>::VARIANTS`.
+///
+/// ```
+/// use numbered::{Numbered, Variants};
+///
+/// #[derive(Debug, Clone, Copy, PartialEq, Numbered)]
+/// #[numbered(u8)]
+/// enum Kind {
+///     A,
+///     B,
+/// }
+///
+/// assert_eq!(Kind::VARIANTS, &[Kind::A, Kind::B]);
+/// assert_eq!(Kind::NUMBERS, &[0, 1]);
+/// ```
+pub trait Variants: Sized + 'static {
+    /// Integer type chosen in `#[numbered(<repr>)]`.
+    type Repr: Copy;
+
+    /// All variants in declaration order.
+    const VARIANTS: &'static [Self];
+
+    /// Assigned number for each variant in declaration order.
+    const NUMBERS: &'static [Self::Repr];
+}
 
 /// Error returned when a number matches no declared variant.
 ///
@@ -204,7 +233,7 @@ mod tests {
             &[Kind::Process, Kind::File, Kind::Network, Kind::Socket]
         );
         assert_eq!(Kind::NUMBERS, &[0, 1, 10, 11]);
-        assert_eq!(Kind::Process.to_string(), "0");
+        assert_eq!(Kind::Process.number().to_string(), "0");
         assert_eq!(u8::from(Kind::File), 1);
         assert_eq!(Kind::from_u8(11).unwrap(), Kind::Socket);
     }
@@ -242,10 +271,20 @@ mod tests {
     }
 
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Numbered)]
-    #[numbered(u8, no_display, no_variants)]
-    enum Quiet {
+    #[numbered(u8)]
+    enum Shared {
         A,
         B,
+    }
+
+    impl core::fmt::Display for Shared {
+        fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+            f.write_str("user")
+        }
+    }
+
+    impl Shared {
+        pub const VARIANTS: &'static [&'static str] = &["a", "b"];
     }
 
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Numbered)]
@@ -263,16 +302,16 @@ mod tests {
         assert_eq!(Level::try_from(1u8), Ok(Level::Error));
         assert_eq!(Level::from_number(4).unwrap(), Level::Debug);
         assert!(Level::from_number(0).is_err());
-        assert_eq!(Level::Error.to_string(), "1");
+        assert_eq!(Level::Error.number(), 1);
     }
 
     #[test]
-    fn skip_display_and_variants() {
-        assert_eq!(Quiet::A.number(), 0);
-        assert_eq!(Quiet::B.as_u8(), 1);
-        assert_eq!(Quiet::NUMBERS, &[0, 1]);
-        assert_eq!(u8::from(Quiet::B), 1);
-        assert_eq!(Quiet::from_number(0).unwrap(), Quiet::A);
+    fn tables_do_not_clash_with_user_items() {
+        assert_eq!(Shared::VARIANTS, &["a", "b"]);
+        assert_eq!(<Shared as Variants>::VARIANTS, &[Shared::A, Shared::B]);
+        assert_eq!(<Shared as Variants>::NUMBERS, &[0, 1]);
+        assert_eq!(Shared::A.to_string(), "user");
+        assert_eq!(Shared::A.number(), 0);
     }
 
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Numbered)]
