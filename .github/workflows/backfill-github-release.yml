@@ -22,7 +22,6 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          sha=96cf07fe78b9f50c3d600f55c19da42b708b913f
           notes_from() {
             awk '/^## \[0.1.0\]/{p=1; next} /^## /{p=0} p' "$1"
           }
@@ -33,14 +32,9 @@ jobs:
               echo "$tag already exists"
               return
             fi
-            # Do not git-push tags: GITHUB_TOKEN cannot push refs that include
-            # workflow files. Create the lightweight tag via the API instead.
-            if ! gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${tag}" >/dev/null 2>&1; then
-              gh api "repos/${GITHUB_REPOSITORY}/git/refs" \
-                -f ref="refs/tags/${tag}" \
-                -f sha="${sha}"
-            fi
-            gh release create "$tag" --title "$tag" --notes "$notes" --verify-tag
+            # No --target SHA: GITHUB_TOKEN cannot attach a release to an
+            # older commit (cli/cli#9514). Tag current default-branch HEAD.
+            gh release create "$tag" --title "$tag" --notes "$notes"
           }
           create numbered-macros-v0.1.0 "$(notes_from macros/CHANGELOG.md)"
           create numbered-v0.1.0 "$(notes_from CHANGELOG.md)"
