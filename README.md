@@ -4,7 +4,7 @@
 [![docs.rs](https://docs.rs/numbered/badge.svg)](https://docs.rs/numbered)
 [![license](https://img.shields.io/crates/l/numbered.svg)](https://github.com/Cardosaum/numbered)
 
-Derive **stable integer numbers** for unit-like enum variants. This crate
+Derive **stable integer numbers** for enum variants. This crate
 kills the boilerplate of handwritten `from_u8` / `as_u8` matches: you pick a
 repr, optionally pin a few variants, and the rest continue from the last
 assigned number.
@@ -77,9 +77,15 @@ assert_eq!(Wire::IoFailed.as_u8(), 10);
 assert_eq!(Wire::from_number(21).unwrap(), Wire::Draining);
 ```
 
-Violations (non-enum, fields, empty enum, missing repr, duplicate keys,
-unknown keys, collisions, overflow, disagreeing discriminant) are compile
-errors, pinned by trybuild tests under `tests/ui/`.
+Violations (non-enum, empty enum, missing repr, duplicate keys, unknown
+keys, collisions, overflow, disagreeing discriminant) are compile errors,
+pinned by trybuild tests under `tests/ui/`.
+
+Fielded variants are allowed. `number(&self)` ignores the payload, so the
+same enum can also derive [cognomen](https://crates.io/crates/cognomen)
+and interpolate `{field}` in extras. `from_number` is omitted (a number
+cannot rebuild fields). `VARIANTS` is then `&[()]` of length `COUNT`;
+`NUMBERS` is unchanged.
 
 ## Generated API
 
@@ -87,12 +93,12 @@ For `#[numbered(u8)]` on `E`:
 
 | item | notes |
 |------|--------|
-| `number()` / `as_u8()` | assigned number (`as_*` follows the repr: `as_u16`, `as_i32`, ...) |
-| `from_number` / `from_u8` | `Result<Self, FromNumberError<u8>>` |
-| `Variants` | `E::VARIANTS` / `E::NUMBERS` after `use numbered::Variants` (non-generic). Trait items, so they cannot clash |
-| `From<E> for u8`, `TryFrom<u8> for E` | always; uses `core` |
+| `number()` / `as_u8()` | assigned number; `&self` (`as_*` follows the repr: `as_u16`, `as_i32`, ...) |
+| `from_number` / `from_u8` | `Result<Self, FromNumberError<u8>>` (fieldless) |
+| `Variants` | `E::VARIANTS` / `E::NUMBERS` / `E::COUNT` after `use numbered::Variants` (non-generic). Trait items, so they cannot clash with cognomen |
+| `From<E> for u8`, `TryFrom<u8> for E` | `TryFrom` is fieldless; uses `core` |
 | `PartialEq<u8>` both ways | compare a variant against its number |
-| `Serialize` / `Deserialize` | feature `serde`; the number, not a string |
+| `Serialize` / `Deserialize` | feature `serde`; the number, not a string. `Deserialize` is fieldless. Do not enable serde on both Numbered and Cognomen for the same type |
 
 ## Features
 

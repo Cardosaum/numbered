@@ -7,7 +7,7 @@ mod numbered;
 
 use proc_macro::TokenStream;
 
-/// Derive stable integer numbers for a unit-like enum.
+/// Derive stable integer numbers for an enum.
 ///
 /// # Container attribute
 ///
@@ -36,11 +36,14 @@ use proc_macro::TokenStream;
 ///
 /// # Generated items
 ///
-/// - `const fn number(self) -> <repr>`
-/// - `const fn as_u8(self) -> <repr>` (name follows the repr)
+/// - `const fn number(&self) -> <repr>`
+/// - `const fn as_u8(&self) -> <repr>` (name follows the repr)
 /// - `const fn from_number(n: <repr>) -> Result<Self, FromNumberError<repr>>`
-/// - `from_u8` alias matching the repr
-/// - `numbered::Variants` (non-generic enums): `VARIANTS` / `NUMBERS`
+///   (fieldless enums)
+/// - `from_u8` alias matching the repr (fieldless)
+/// - `numbered::Variants` (non-generic enums): `VARIANTS` / `NUMBERS` /
+///   `COUNT`. Fielded enums use `Variant = ()` so `VARIANTS.len()` still
+///   works next to cognomen extras
 /// - `From<Self> for <repr>`, `TryFrom<repr> for Self`
 /// - `PartialEq<repr>` both ways
 /// - `Serialize` / `Deserialize` (feature `serde`)
