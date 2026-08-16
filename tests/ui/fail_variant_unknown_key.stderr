@@ -1,0 +1,5 @@
+error: unknown numbered variant key `foo`
+ --> tests/ui/fail_variant_unknown_key.rs:6:16
+  |
+6 |     #[numbered(foo = 1)]
+  |                ^^^

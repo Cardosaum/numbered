@@ -440,15 +440,24 @@ pub fn derive(input: TokenStream) -> Result<TokenStream> {
 
     let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
 
-    let variants_const = input.generics.params.is_empty().then(|| {
+    let variants_impl = input.generics.params.is_empty().then(|| {
         quote! {
-            /// All variants in declaration order.
-            pub const VARIANTS: &'static [Self] = &[#(Self::#idents,)*];
-
-            /// [`Self::number`] for each variant in declaration order.
-            pub const NUMBERS: &'static [#repr_ty] = &[#(#number_lits,)*];
+            impl #crate_path::Variants for #name {
+                type Repr = #repr_ty;
+                const VARIANTS: &'static [Self] = &[#(Self::#idents,)*];
+                const NUMBERS: &'static [Self::Repr] = &[#(#number_lits,)*];
+            }
         }
     });
+
+    let de_impl_generics = {
+        let params = &input.generics.params;
+        if params.is_empty() {
+            quote! { <'de> }
+        } else {
+            quote! { <'de, #params> }
+        }
+    };
 
     let serde_impls = cfg!(feature = "serde").then(|| {
         quote! {
@@ -462,7 +471,7 @@ pub fn derive(input: TokenStream) -> Result<TokenStream> {
                 }
             }
 
-            impl<'de> #crate_path::__serde::Deserialize<'de> for #name #ty_generics #where_clause {
+            impl #de_impl_generics #crate_path::__serde::Deserialize<'de> for #name #ty_generics #where_clause {
                 fn deserialize<D: #crate_path::__serde::Deserializer<'de>>(
                     deserializer: D,
                 ) -> ::core::result::Result<Self, D::Error> {
@@ -475,8 +484,6 @@ pub fn derive(input: TokenStream) -> Result<TokenStream> {
 
     Ok(quote! {
         impl #impl_generics #name #ty_generics #where_clause {
-            #variants_const
-
             /// Stable integer number assigned to this variant.
             ///
             /// Overridden by `#[numbered(n = ...)]` or a native discriminant.
@@ -515,13 +522,7 @@ pub fn derive(input: TokenStream) -> Result<TokenStream> {
             }
         }
 
-        impl #impl_generics ::core::fmt::Display for #name #ty_generics #where_clause {
-            #[inline]
-            fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-                let n = match self { #(#number_arms,)* };
-                ::core::fmt::Display::fmt(&n, f)
-            }
-        }
+        #variants_impl
 
         impl #impl_generics ::core::convert::From<#name #ty_generics> for #repr_ty #where_clause {
             #[inline]
@@ -533,7 +534,9 @@ pub fn derive(input: TokenStream) -> Result<TokenStream> {
         impl #impl_generics ::core::convert::TryFrom<#repr_ty> for #name #ty_generics #where_clause {
             type Error = #crate_path::FromNumberError<#repr_ty>;
             #[inline]
-            fn try_from(n: #repr_ty) -> ::core::result::Result<Self, Self::Error> {
+            fn try_from(
+                n: #repr_ty,
+            ) -> ::core::result::Result<Self, #crate_path::FromNumberError<#repr_ty>> {
                 Self::from_number(n)
             }
         }
@@ -559,6 +562,27 @@ pub fn derive(input: TokenStream) -> Result<TokenStream> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use quote::quote;
+
+    fn err_msg(input: TokenStream) -> String {
+        derive(input)
+            .expect_err("expected derive to fail")
+            .to_string()
+    }
+
+    fn assert_err(input: TokenStream, needle: &str) {
+        let msg = err_msg(input);
+        assert!(
+            msg.contains(needle),
+            "expected {needle:?} in error, got {msg:?}"
+        );
+    }
+
+    fn ok(input: TokenStream) -> String {
+        derive(input)
+            .expect("expected derive to succeed")
+            .to_string()
+    }
 
     #[test]
     fn repr_fits() {
@@ -574,13 +598,409 @@ mod tests {
         assert!(ReprType::Isize.fits(i64::MIN as i128));
         assert!(ReprType::Usize.fits(0));
         assert!(!ReprType::Usize.fits(-1));
+        assert!(ReprType::U32.fits(u32::MAX as i128));
+        assert!(ReprType::U64.fits(u64::MAX as i128));
+        assert!(ReprType::I16.fits(i16::MIN as i128));
+        assert!(ReprType::I32.fits(i32::MAX as i128));
+        assert!(ReprType::I64.fits(i64::MIN as i128));
+        assert!(!ReprType::I64.fits(i128::from(i64::MAX) + 1));
     }
 
     #[test]
     fn repr_from_name() {
-        assert_eq!(ReprType::from_name("u8").unwrap().name(), "u8");
-        assert_eq!(ReprType::from_name("isize").unwrap().name(), "isize");
+        for name in [
+            "u8", "u16", "u32", "u64", "usize", "i8", "i16", "i32", "i64", "isize",
+        ] {
+            let repr = ReprType::from_name(name).expect(name);
+            assert_eq!(repr.name(), name);
+            assert_eq!(repr.ty_tokens().to_string(), name);
+        }
         assert!(ReprType::from_name("f32").is_none());
         assert!(ReprType::from_name("u128").is_none());
+        assert!(ReprType::from_name("i128").is_none());
+    }
+
+    #[test]
+    fn rejects_every_container_error() {
+        assert_err(
+            quote! {
+                #[numbered(u8)]
+                struct NotAnEnum { x: u8 }
+            },
+            "Numbered can only be derived for enums",
+        );
+        assert_err(
+            quote! {
+                #[numbered(u8)]
+                union NotAnEnum { x: u8 }
+            },
+            "Numbered can only be derived for enums",
+        );
+        assert_err(
+            quote! {
+                #[numbered(u8)]
+                enum Mode {}
+            },
+            "Numbered enum must have at least one variant",
+        );
+        assert_err(
+            quote! {
+                #[numbered(u8)]
+                enum Mode { Unit, WithField(u8) }
+            },
+            "Numbered only supports unit variants (no fields)",
+        );
+        assert_err(
+            quote! {
+                #[numbered(u8)]
+                enum Mode { Named { x: u8 } }
+            },
+            "Numbered only supports unit variants (no fields)",
+        );
+        assert_err(
+            quote! { enum Mode { A } },
+            "missing #[numbered(<repr>)] container attribute",
+        );
+        assert_err(
+            quote! {
+                #[numbered(u8)]
+                #[numbered(u16)]
+                enum Mode { A }
+            },
+            "duplicate #[numbered(...)] attribute",
+        );
+        assert_err(
+            quote! {
+                #[numbered()]
+                enum Mode { A }
+            },
+            "missing numbered repr type",
+        );
+        assert_err(
+            quote! {
+                #[numbered(start = 1)]
+                enum Mode { A }
+            },
+            "missing numbered repr type",
+        );
+        assert_err(
+            quote! {
+                #[numbered(1)]
+                enum Mode { A }
+            },
+            "expected numbered repr type or key",
+        );
+        assert_err(
+            quote! {
+                #[numbered(f32)]
+                enum Mode { A }
+            },
+            "unknown numbered repr type `f32`",
+        );
+        assert_err(
+            quote! {
+                #[numbered(repr = f32)]
+                enum Mode { A }
+            },
+            "unknown numbered repr type `f32`",
+        );
+        assert_err(
+            quote! {
+                #[numbered(u8, rename = "x")]
+                enum Mode { A }
+            },
+            "unknown numbered key `rename`",
+        );
+        assert_err(
+            quote! {
+                #[numbered(u8, start = 1, start = 2)]
+                enum Mode { A }
+            },
+            "duplicate numbered start",
+        );
+        assert_err(
+            quote! {
+                #[numbered(u8, u16)]
+                enum Mode { A }
+            },
+            "duplicate numbered repr",
+        );
+        assert_err(
+            quote! {
+                #[numbered(repr = u8, u16)]
+                enum Mode { A }
+            },
+            "duplicate numbered repr",
+        );
+        assert_err(
+            quote! {
+                #[numbered(u8, crate = ::a, crate = ::b)]
+                enum Mode { A }
+            },
+            "duplicate numbered crate",
+        );
+    }
+
+    #[test]
+    fn rejects_every_variant_error() {
+        assert_err(
+            quote! {
+                #[numbered(u8)]
+                enum Mode {
+                    #[numbered(foo = 1)]
+                    A,
+                }
+            },
+            "unknown numbered variant key `foo`",
+        );
+        assert_err(
+            quote! {
+                #[numbered(u8)]
+                enum Mode {
+                    #[numbered()]
+                    A,
+                }
+            },
+            "variant #[numbered(...)] requires n = <integer>",
+        );
+        assert_err(
+            quote! {
+                #[numbered(u8)]
+                enum Mode {
+                    #[numbered(n = 1, n = 2)]
+                    A,
+                }
+            },
+            "duplicate numbered n",
+        );
+        assert_err(
+            quote! {
+                #[numbered(u8)]
+                enum Mode {
+                    #[numbered(n = 1)]
+                    #[numbered(n = 1)]
+                    A,
+                }
+            },
+            "duplicate #[numbered(...)] on variant",
+        );
+        assert_err(
+            quote! {
+                #[numbered(u8)]
+                enum Mode { A = 1 + 1 }
+            },
+            "numbered discriminant must be an integer literal",
+        );
+        assert_err(
+            quote! {
+                #[numbered(u8)]
+                enum Mode {
+                    #[numbered(n = 5)]
+                    A = 3,
+                }
+            },
+            "#[numbered(n = 5)] disagrees with discriminant 3",
+        );
+        assert_err(
+            quote! {
+                #[numbered(u8)]
+                enum Mode {
+                    Zero,
+                    #[numbered(n = 0)]
+                    AlsoZero,
+                }
+            },
+            "number 0 is shared by `Zero` and `AlsoZero`",
+        );
+        assert_err(
+            quote! {
+                #[numbered(u8)]
+                enum Mode {
+                    Zero = 1,
+                    Also = 1,
+                }
+            },
+            "number 1 is shared by `Zero` and `Also`",
+        );
+    }
+
+    #[test]
+    fn rejects_every_overflow() {
+        assert_err(
+            quote! {
+                #[numbered(u8, start = 256)]
+                enum Mode { A }
+            },
+            "number 256 does not fit in u8",
+        );
+        assert_err(
+            quote! {
+                #[numbered(u8, start = -1)]
+                enum Mode { A }
+            },
+            "number -1 does not fit in u8",
+        );
+        assert_err(
+            quote! {
+                #[numbered(u8)]
+                enum Mode {
+                    #[numbered(n = 256)]
+                    TooBig,
+                }
+            },
+            "number 256 does not fit in u8",
+        );
+        assert_err(
+            quote! {
+                #[numbered(u8)]
+                enum Mode {
+                    #[numbered(n = -1)]
+                    Neg,
+                }
+            },
+            "number -1 does not fit in u8",
+        );
+        assert_err(
+            quote! {
+                #[numbered(u8)]
+                enum Mode { A = 256 }
+            },
+            "number 256 does not fit in u8",
+        );
+        assert_err(
+            quote! {
+                #[numbered(u8)]
+                enum Mode { A = 255, B }
+            },
+            "number 256 does not fit in u8",
+        );
+        assert_err(
+            quote! {
+                #[numbered(i8)]
+                enum Mode {
+                    #[numbered(n = 128)]
+                    TooBig,
+                }
+            },
+            "number 128 does not fit in i8",
+        );
+        assert_err(
+            quote! {
+                #[numbered(i8, start = -129)]
+                enum Mode { A }
+            },
+            "number -129 does not fit in i8",
+        );
+        assert_err(
+            quote! {
+                #[numbered(usize, start = -1)]
+                enum Mode { A }
+            },
+            "number -1 does not fit in usize",
+        );
+        assert_err(
+            quote! {
+                #[numbered(u8)]
+                enum Mode { A = 0x100 }
+            },
+            "number 256 does not fit in u8",
+        );
+    }
+
+    #[test]
+    fn accepts_assignment_forms() {
+        let basic = ok(quote! {
+            #[numbered(u8)]
+            enum Mode { A, B }
+        });
+        assert!(basic.contains("FromNumberError"));
+        assert!(!basic.contains("Self :: Error"));
+        assert!(basic.contains("Variants"));
+        assert!(basic.contains("from_u8"));
+        assert!(basic.contains("as_u8"));
+
+        ok(quote! {
+            #[numbered(u8, start = 1)]
+            enum Mode { A, B }
+        });
+        ok(quote! {
+            #[numbered(repr = u16, start = 1)]
+            enum Mode { A, B = 443, C }
+        });
+        ok(quote! {
+            #[numbered(u8)]
+            enum Mode {
+                #[numbered(n = 10)]
+                A,
+                B,
+            }
+        });
+        ok(quote! {
+            #[numbered(u8)]
+            enum Mode {
+                #[numbered(n = 5)]
+                A = 5,
+            }
+        });
+        ok(quote! {
+            #[numbered(u8)]
+            enum Mode { Hex = 0x10, Paren = (7) }
+        });
+        ok(quote! {
+            #[numbered(i8, start = -1)]
+            enum Mode { A, B = 5, C }
+        });
+        ok(quote! {
+            #[numbered(u8, start = 1,)]
+            enum Mode {
+                #[numbered(n = 10,)]
+                A,
+            }
+        });
+        let via_crate = ok(quote! {
+            #[numbered(u8, crate = ::other::numbered)]
+            enum Mode { A }
+        });
+        assert!(via_crate.contains("other"));
+
+        let generic = ok(quote! {
+            #[numbered(u8)]
+            enum Flag<const N: usize> { A, B }
+        });
+        assert!(!generic.contains("Variants"));
+        #[cfg(feature = "serde")]
+        {
+            assert!(generic.contains("const N"));
+            assert!(generic.contains("Serialize"));
+            assert!(generic.contains("Deserialize"));
+        }
+
+        let error_var = ok(quote! {
+            #[numbered(u8, start = 1)]
+            enum Level { Error, Warn }
+        });
+        assert!(error_var.contains("FromNumberError"));
+        assert!(!error_var.contains("Result < Self , Self :: Error >"));
+    }
+
+    #[test]
+    fn accepts_every_repr() {
+        for repr in [
+            quote!(u8),
+            quote!(u16),
+            quote!(u32),
+            quote!(u64),
+            quote!(usize),
+            quote!(i8),
+            quote!(i16),
+            quote!(i32),
+            quote!(i64),
+            quote!(isize),
+        ] {
+            ok(quote! {
+                #[numbered(#repr)]
+                enum Mode { A, B }
+            });
+        }
     }
 }

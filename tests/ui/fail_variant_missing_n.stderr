@@ -1,0 +1,5 @@
+error: variant #[numbered(...)] requires n = <integer>
+ --> tests/ui/fail_variant_missing_n.rs:6:5
+  |
+6 |     #[numbered()]
+  |     ^

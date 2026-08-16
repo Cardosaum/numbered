@@ -1,0 +1,7 @@
+error: number -1 does not fit in usize
+ --> tests/ui/fail_usize_negative.rs:3:10
+  |
+3 | #[derive(Numbered)]
+  |          ^^^^^^^^
+  |
+  = note: this error originates in the derive macro `Numbered` (in Nightly builds, run with -Z macro-backtrace for more info)

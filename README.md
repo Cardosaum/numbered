@@ -17,7 +17,7 @@ numbered = "0.1"
 ```
 
 ```rust
-use numbered::Numbered;
+use numbered::{Numbered, Variants};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Numbered)]
 #[numbered(u8)]
@@ -39,7 +39,9 @@ assert_eq!(Kind::NUMBERS, &[0, 1, 10, 11]);
 ```
 
 Native Rust discriminants (`Process = 1`) are treated as `#[numbered(n = 1)]`.
-If both are present they must agree, or the derive is a compile error.
+If both are present they must agree, or the derive is a compile error. A
+variant named `Error` is fine: generated `TryFrom` names `FromNumberError`
+instead of `Self::Error`.
 
 ## Attributes
 
@@ -87,8 +89,7 @@ For `#[numbered(u8)]` on `E`:
 |------|--------|
 | `number()` / `as_u8()` | assigned number (`as_*` follows the repr: `as_u16`, `as_i32`, ...) |
 | `from_number` / `from_u8` | `Result<Self, FromNumberError<u8>>` |
-| `E::VARIANTS`, `E::NUMBERS` | declaration order (non-generic enums) |
-| `Display` | decimal number |
+| `Variants` | `E::VARIANTS` / `E::NUMBERS` after `use numbered::Variants` (non-generic). Trait items, so they cannot clash |
 | `From<E> for u8`, `TryFrom<u8> for E` | always; uses `core` |
 | `PartialEq<u8>` both ways | compare a variant against its number |
 | `Serialize` / `Deserialize` | feature `serde`; the number, not a string |
@@ -107,8 +108,8 @@ For `#[numbered(u8)]` on `E`:
 numbered = { version = "0.1", default-features = false }
 ```
 
-Numbers, parse, `Display`, `From` / `TryFrom`, and `VARIANTS` use only
-`core`. Add `features = ["serde"]` for wire formats.
+Numbers, parse, `From` / `TryFrom`, and `Variants` use only `core`. Add
+`features = ["serde"]` for wire formats. Print a number with `e.number()`.
 
 ## MSRV
 

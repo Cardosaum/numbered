@@ -1,0 +1,7 @@
+error: number 256 does not fit in u8
+ --> tests/ui/fail_start_overflow.rs:3:10
+  |
+3 | #[derive(Numbered)]
+  |          ^^^^^^^^
+  |
+  = note: this error originates in the derive macro `Numbered` (in Nightly builds, run with -Z macro-backtrace for more info)

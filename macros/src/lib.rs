@@ -40,8 +40,8 @@ use proc_macro::TokenStream;
 /// - `const fn as_u8(self) -> <repr>` (name follows the repr)
 /// - `const fn from_number(n: <repr>) -> Result<Self, FromNumberError<repr>>`
 /// - `from_u8` alias matching the repr
-/// - `VARIANTS` / `NUMBERS` (non-generic enums)
-/// - `Display`, `From<Self> for <repr>`, `TryFrom<repr> for Self`
+/// - `numbered::Variants` (non-generic enums): `VARIANTS` / `NUMBERS`
+/// - `From<Self> for <repr>`, `TryFrom<repr> for Self`
 /// - `PartialEq<repr>` both ways
 /// - `Serialize` / `Deserialize` (feature `serde`)
 ///

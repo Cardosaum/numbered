@@ -1,0 +1,5 @@
+error: duplicate numbered repr
+ --> tests/ui/fail_duplicate_repr.rs:4:16
+  |
+4 | #[numbered(u8, u16)]
+  |                ^^^

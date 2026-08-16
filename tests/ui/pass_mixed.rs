@@ -1,4 +1,4 @@
-use numbered::Numbered;
+use numbered::{Numbered, Variants};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Numbered)]
 #[numbered(u8)]
@@ -35,5 +35,5 @@ fn main() {
     assert_eq!(Signed::Next.number(), 8);
     assert_eq!(Signed::from_i8(-2).unwrap(), Signed::Neg);
     assert_eq!(Signed::NUMBERS, &[-2, -1, 7, 8]);
-    assert_eq!(Signed::Lucky.to_string(), "7");
+    assert_eq!(Signed::Lucky.number(), 7);
 }

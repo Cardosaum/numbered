@@ -1,4 +1,4 @@
-use numbered::Numbered;
+use numbered::{Numbered, Variants};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Numbered)]
 #[numbered(u8)]
@@ -18,6 +18,6 @@ fn main() {
     assert!(1u8 == Kind::File);
     assert_eq!(Kind::VARIANTS.len(), 3);
     assert_eq!(Kind::NUMBERS, &[0, 1, 2]);
-    assert_eq!(Kind::Process.to_string(), "0");
+    assert_eq!(Kind::Process.number(), 0);
     assert_eq!(u8::from(Kind::Socket), 2);
 }

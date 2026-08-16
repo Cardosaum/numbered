@@ -1,0 +1,5 @@
+error: numbered discriminant must be an integer literal
+ --> tests/ui/fail_bad_discriminant.rs:6:9
+  |
+6 |     A = 1 + 1,
+  |         ^

@@ -1,0 +1,5 @@
+error: duplicate numbered n
+ --> tests/ui/fail_duplicate_n.rs:6:23
+  |
+6 |     #[numbered(n = 1, n = 2)]
+  |                       ^

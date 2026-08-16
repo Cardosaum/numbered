@@ -1,0 +1,5 @@
+error: number 128 does not fit in i8
+ --> tests/ui/fail_i8_overflow.rs:6:20
+  |
+6 |     #[numbered(n = 128)]
+  |                    ^^^
