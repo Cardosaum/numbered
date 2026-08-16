@@ -1,9 +1,8 @@
 [workspace]
 repo_url = "https://github.com/Cardosaum/numbered"
 pr_labels = ["release"]
-# First GitHub release: create tags/releases on this main push. crates.io
-# already has 0.1.0, so cargo publish is skipped. Flip back to false after.
-release_always = true
+# Publish when the release PR is merged, not on every main commit.
+release_always = false
 
 [[package]]
 name = "numbered"
