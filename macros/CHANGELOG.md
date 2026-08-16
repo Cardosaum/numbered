@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0](https://github.com/Cardosaum/numbered/compare/numbered-macros-v0.2.0...numbered-macros-v0.3.0) - 2026-08-16
+
+### Added
+
+- number fielded variants without requiring Copy ([#4](https://github.com/Cardosaum/numbered/pull/4))
+
 ### Added
 
 - fielded variants and `Variants::Variant` / `COUNT` so tables work next to
