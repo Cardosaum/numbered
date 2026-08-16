@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0](https://github.com/Cardosaum/numbered/releases/tag/numbered-macros-v0.2.0) - 2026-08-16
+
 ### Changed
 
 - emit `VARIANTS` / `NUMBERS` on `numbered::Variants`, not as inherent items
@@ -15,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - `TryFrom` now names `FromNumberError` instead of `Self::Error`, so a variant named `Error` compiles
+- `Deserialize` now keeps the enum's generics, so const-generic enums compile with `serde`
 
 ## [0.1.0](https://github.com/Cardosaum/numbered/releases/tag/numbered-macros-v0.1.0) - 2026-08-16
 

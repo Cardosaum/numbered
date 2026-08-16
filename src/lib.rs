@@ -99,7 +99,7 @@
 //! # `no_std`
 //!
 //! ```toml
-//! numbered = { version = "0.1", default-features = false }
+//! numbered = { version = "0.2", default-features = false }
 //! ```
 //!
 //! Numbers, parse, `From` / `TryFrom`, and [`Variants`] use only `core`.

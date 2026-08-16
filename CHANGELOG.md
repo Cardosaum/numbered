@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0](https://github.com/Cardosaum/numbered/releases/tag/numbered-v0.2.0) - 2026-08-16
+
 ### Changed
 
 - `VARIANTS` and `NUMBERS` live on the `Variants` trait, not as inherent items, so they cannot clash with another derive or user code
