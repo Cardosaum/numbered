@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.1](https://github.com/Cardosaum/numbered/compare/numbered-v0.3.0...numbered-v0.3.1) - 2026-08-21
+
+### Other
+
+- Move number() onto Number, matching cognomen Label ([#6](https://github.com/Cardosaum/numbered/pull/6))
+
 ### Added
 
 - `Number` and `FromNumber` in this crate
