@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.3.1](https://github.com/Cardosaum/numbered/compare/numbered-macros-v0.3.0...numbered-macros-v0.3.1) - 2026-08-21
+## [0.4.0](https://github.com/Cardosaum/numbered/compare/numbered-macros-v0.3.0...numbered-macros-v0.4.0) - 2026-08-21
 
 ### Other
 
