@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `Number` and `FromNumber` in this crate
+
+### Changed
+
+- `number` / `as_*` are trait items, not inherent methods on `E`. Import
+  `Number` or use UFCS
+- `from_number` lives on `FromNumber` (fieldless only)
+
 ## [0.3.0](https://github.com/Cardosaum/numbered/compare/numbered-v0.2.0...numbered-v0.3.0) - 2026-08-16
 
 ### Added

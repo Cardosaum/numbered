@@ -1,4 +1,4 @@
-use numbered::{Numbered, Variants};
+use numbered::{FromNumber, Number, Numbered, Variants};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Numbered)]
 #[numbered(u8)]

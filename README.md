@@ -9,6 +9,10 @@ kills the boilerplate of handwritten `from_u8` / `as_u8` matches: you pick a
 repr, optionally pin a few variants, and the rest continue from the last
 assigned number.
 
+Numbers are trait items (`Number`, `FromNumber`), not inherent methods on
+`E`. Import the trait to call `e.number()`, or use UFCS when a user `fn`
+or parent trait owns the same name.
+
 Full API reference: <https://docs.rs/numbered>
 
 ```toml
@@ -17,7 +21,7 @@ numbered = "0.1"
 ```
 
 ```rust
-use numbered::{Numbered, Variants};
+use numbered::{FromNumber, Number, Numbered, Variants};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Numbered)]
 #[numbered(u8)]
@@ -60,7 +64,7 @@ the same. Gaps are allowed. After an explicit number, the next auto variant
 is `last + 1`.
 
 ```rust
-use numbered::Numbered;
+use numbered::{FromNumber, Number, Numbered};
 
 #[derive(Debug, PartialEq, Numbered)]
 #[numbered(u8, start = 1)]
@@ -81,20 +85,20 @@ Violations (non-enum, empty enum, missing repr, duplicate keys, unknown
 keys, collisions, overflow, disagreeing discriminant) are compile errors,
 pinned by trybuild tests under `tests/ui/`.
 
-Fielded variants are allowed. `number(&self)` ignores the payload, so the
+Fielded variants keep `Number`. `number(&self)` ignores the payload, so the
 same enum can also derive [cognomen](https://crates.io/crates/cognomen)
-and interpolate `{field}` in extras. `from_number` is omitted (a number
+and interpolate `{field}` in extras. `FromNumber` is omitted (a number
 cannot rebuild fields). `VARIANTS` is then `&[()]` of length `COUNT`;
 `NUMBERS` is unchanged.
 
 ## Generated API
 
-For `#[numbered(u8)]` on `E`:
+For `#[numbered(u8)]` on `E`. Nothing is inherent on `E`.
 
 | item | notes |
 |------|--------|
-| `number()` / `as_u8()` | assigned number; `&self` (`as_*` follows the repr: `as_u16`, `as_i32`, ...) |
-| `from_number` / `from_u8` | `Result<Self, FromNumberError<u8>>` (fieldless) |
+| `Number` | `number()` / `as_u8()`; `&self` (`as_*` follows the repr: `as_u16`, `as_i32`, ...) |
+| `FromNumber` | `from_number` / `from_u8`; `Result<Self, FromNumberError<u8>>` (fieldless) |
 | `Variants` | `E::VARIANTS` / `E::NUMBERS` / `E::COUNT` after `use numbered::Variants` (non-generic). Trait items, so they cannot clash with cognomen |
 | `From<E> for u8`, `TryFrom<u8> for E` | `TryFrom` is fieldless; uses `core` |
 | `PartialEq<u8>` both ways | compare a variant against its number |
@@ -114,8 +118,9 @@ For `#[numbered(u8)]` on `E`:
 numbered = { version = "0.2", default-features = false }
 ```
 
-Numbers, parse, `From` / `TryFrom`, and `Variants` use only `core`. Add
-`features = ["serde"]` for wire formats. Print a number with `e.number()`.
+`Number`, `FromNumber`, `From` / `TryFrom`, and `Variants` use only `core`.
+Add `features = ["serde"]` for wire formats. Print a number with
+`e.number()`.
 
 ## MSRV
 

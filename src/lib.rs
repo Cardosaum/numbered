@@ -6,10 +6,14 @@
 //! Downstream crates use this to drop handwritten `from_u8` / `as_u8` matches
 //! on status codes, wire tags, and similar closed integer sets.
 //!
+//! Numbers are **trait items** in this crate, not inherent methods on `E`.
+//! Import [`Number`] / [`FromNumber`] to call them, or use UFCS
+//! (`<E as Number>::number(&e)`). A user `fn number()` still compiles.
+//!
 //! # Quick start
 //!
 //! ```
-//! use numbered::{Numbered, Variants};
+//! use numbered::{FromNumber, Number, Numbered, Variants};
 //!
 //! #[derive(Debug, Clone, Copy, PartialEq, Eq, Numbered)]
 //! #[numbered(u8)]
@@ -53,7 +57,7 @@
 //! variant is `last + 1`.
 //!
 //! ```
-//! use numbered::Numbered;
+//! use numbered::{FromNumber, Number, Numbered};
 //!
 //! #[derive(Debug, PartialEq, Numbered)]
 //! #[numbered(u8, start = 1)]
@@ -70,12 +74,12 @@
 //! assert_eq!(Wire::from_number(21).unwrap(), Wire::Draining);
 //! ```
 //!
-//! Fielded variants keep `number()` and the [`Variants`] tables. Pair with
+//! Fielded variants keep [`Number`] and the [`Variants`] tables. Pair with
 //! cognomen `reason = "... {field}"` on the same enum; a number cannot
-//! rebuild the payload, so `from_number` is omitted.
+//! rebuild the payload, so [`FromNumber`] is omitted.
 //!
 //! ```
-//! use numbered::{Numbered, Variants};
+//! use numbered::{Number, Numbered, Variants};
 //!
 //! #[derive(Debug, Clone, PartialEq, Numbered)]
 //! #[numbered(u8, start = 1)]
@@ -96,12 +100,13 @@
 //!
 //! # Generated API
 //!
-//! For `#[numbered(u8)]` on `E`:
+//! For `#[numbered(u8)]` on `E`. Nothing is inherent on `E`.
 //!
-//! - `number()` / `as_u8()` -> `u8` (`as_*` follows the repr). Takes `&self`
-//!   so fielded variants do not need `Copy` (same shape as cognomen extras)
-//! - `from_number` / `from_u8` -> `Result<Self, FromNumberError<u8>>`
-//!   (fieldless enums; a number cannot rebuild a payload)
+//! - [`Number`]: `number()` / `as_u8()` (`as_*` follows the repr). Takes
+//!   `&self` so fielded variants do not need `Copy`
+//! - [`FromNumber`]: `from_number` / `from_u8` ->
+//!   `Result<Self, FromNumberError<u8>>` (fieldless enums; a number cannot
+//!   rebuild a payload)
 //! - [`Variants`] (non-generic enums): `E::VARIANTS`, `E::NUMBERS`, and
 //!   `E::COUNT` after `use numbered::Variants`. Trait items, so they cannot
 //!   clash with cognomen or a user `const VARIANTS`. Fielded enums keep
@@ -127,8 +132,8 @@
 //! numbered = { version = "0.2", default-features = false }
 //! ```
 //!
-//! Numbers, parse, `From` / `TryFrom`, and [`Variants`] use only `core`.
-//! Add `features = ["serde"]` for wire formats.
+//! [`Number`], [`FromNumber`], `From` / `TryFrom`, and [`Variants`] use only
+//! `core`. Add `features = ["serde"]` for wire formats.
 //!
 //! # MSRV
 //!
@@ -145,6 +150,9 @@ extern crate alloc;
 #[cfg(feature = "std")]
 extern crate std;
 
+mod number;
+
+pub use number::{FromNumber, Number};
 #[doc(inline)]
 pub use numbered_macros::Numbered;
 
@@ -194,12 +202,12 @@ pub trait Variants: Sized + 'static {
 
 /// Error returned when a number matches no declared variant.
 ///
-/// Produced by [`TryFrom`](core::convert::TryFrom) and `E::from_number`.
-/// The unmatched number is stored in [`Self::number`]. With `std`, this
-/// implements [`std::error::Error`].
+/// Produced by [`TryFrom`](core::convert::TryFrom) and
+/// [`FromNumber::from_number`]. The unmatched number is stored in
+/// [`Self::number`]. With `std`, this implements [`std::error::Error`].
 ///
 /// ```
-/// use numbered::{FromNumberError, Numbered};
+/// use numbered::{FromNumber, FromNumberError, Numbered};
 ///
 /// #[derive(Debug, Numbered)]
 /// #[numbered(u8)]
@@ -356,6 +364,14 @@ mod tests {
 
     impl Shared {
         pub const VARIANTS: &'static [&'static str] = &["a", "b"];
+
+        fn number(&self) -> u8 {
+            9
+        }
+
+        fn as_u8(&self) -> u8 {
+            8
+        }
     }
 
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Numbered)]
@@ -382,7 +398,10 @@ mod tests {
         assert_eq!(<Shared as Variants>::VARIANTS, &[Shared::A, Shared::B]);
         assert_eq!(<Shared as Variants>::NUMBERS, &[0, 1]);
         assert_eq!(Shared::A.to_string(), "user");
-        assert_eq!(Shared::A.number(), 0);
+        assert_eq!(Shared::A.number(), 9);
+        assert_eq!(Shared::A.as_u8(), 8);
+        assert_eq!(<Shared as Number>::number(&Shared::A), 0);
+        assert_eq!(<Shared as Number>::as_u8(&Shared::A), 0);
     }
 
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Numbered)]
@@ -403,14 +422,12 @@ mod tests {
     }
 
     const fn kind_number_in_const() -> u8 {
-        Kind::Process.number()
+        Kind::NUMBERS[0]
     }
 
     #[test]
     fn works_in_const() {
         assert_eq!(kind_number_in_const(), 0);
-        const FROM: Result<Kind, FromNumberError<u8>> = Kind::from_number(1);
-        assert_eq!(FROM, Ok(Kind::File));
         const TABLES: &[u8] = Kind::NUMBERS;
         assert_eq!(TABLES, &[0, 1, 10, 11]);
     }

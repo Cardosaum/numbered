@@ -36,11 +36,10 @@ use proc_macro::TokenStream;
 ///
 /// # Generated items
 ///
-/// - `const fn number(&self) -> <repr>`
-/// - `const fn as_u8(&self) -> <repr>` (name follows the repr)
-/// - `const fn from_number(n: <repr>) -> Result<Self, FromNumberError<repr>>`
-///   (fieldless enums)
-/// - `from_u8` alias matching the repr (fieldless)
+/// All of these are trait impls. Nothing is inherent on `E`.
+///
+/// - `numbered::Number`: `number` / `as_u8` (`as_*` follows the repr)
+/// - `numbered::FromNumber`: `from_number` / `from_u8` (fieldless enums)
 /// - `numbered::Variants` (non-generic enums): `VARIANTS` / `NUMBERS` /
 ///   `COUNT`. Fielded enums use `Variant = ()` so `VARIANTS.len()` still
 ///   works next to cognomen extras
