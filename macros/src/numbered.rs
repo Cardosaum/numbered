@@ -414,8 +414,6 @@ pub fn derive(input: TokenStream) -> Result<TokenStream> {
     let variants = assign_numbers(&raw_variants, attr.repr, attr.start)?;
     let crate_path = &attr.crate_path;
     let repr_ty = attr.repr.ty_tokens();
-    let as_method = format_ident!("as_{}", attr.repr.name());
-    let from_method = format_ident!("from_{}", attr.repr.name());
     let fieldless = variants.iter().all(|v| !has_payload(v.fields));
 
     let idents: Vec<&Ident> = variants.iter().map(|v| v.ident).collect();
@@ -505,7 +503,8 @@ pub fn derive(input: TokenStream) -> Result<TokenStream> {
                     deserializer: D,
                 ) -> ::core::result::Result<Self, D::Error> {
                     let n = <#repr_ty as #crate_path::__serde::Deserialize>::deserialize(deserializer)?;
-                    Self::from_number(n).map_err(#crate_path::__serde::de::Error::custom)
+                    #crate_path::FromNumber::from_number(n)
+                        .map_err(#crate_path::__serde::de::Error::custom)
                 }
             }
         }
@@ -513,25 +512,18 @@ pub fn derive(input: TokenStream) -> Result<TokenStream> {
 
     let parse_impls = fieldless.then(|| {
         quote! {
-            /// Parse a number into `Self`.
-            ///
-            /// Equivalent to [`TryFrom::try_from`](core::convert::TryFrom).
-            #[inline]
-            pub const fn from_number(
-                n: #repr_ty,
-            ) -> ::core::result::Result<Self, #crate_path::FromNumberError<#repr_ty>> {
-                match n {
-                    #(#from_arms,)*
-                    n => ::core::result::Result::Err(#crate_path::FromNumberError::new(n)),
-                }
-            }
+            impl #impl_generics #crate_path::FromNumber for #name #ty_generics #where_clause {
+                type Repr = #repr_ty;
 
-            /// Alias of [`Self::from_number`].
-            #[inline]
-            pub const fn #from_method(
-                n: #repr_ty,
-            ) -> ::core::result::Result<Self, #crate_path::FromNumberError<#repr_ty>> {
-                Self::from_number(n)
+                #[inline]
+                fn from_number(
+                    n: #repr_ty,
+                ) -> ::core::result::Result<Self, #crate_path::FromNumberError<#repr_ty>> {
+                    match n {
+                        #(#from_arms,)*
+                        n => ::core::result::Result::Err(#crate_path::FromNumberError::new(n)),
+                    }
+                }
             }
         }
     });
@@ -544,40 +536,30 @@ pub fn derive(input: TokenStream) -> Result<TokenStream> {
                 fn try_from(
                     n: #repr_ty,
                 ) -> ::core::result::Result<Self, #crate_path::FromNumberError<#repr_ty>> {
-                    Self::from_number(n)
+                    #crate_path::FromNumber::from_number(n)
                 }
             }
         }
     });
 
     Ok(quote! {
-        impl #impl_generics #name #ty_generics #where_clause {
-            /// Stable integer number assigned to this variant.
-            ///
-            /// Overridden by `#[numbered(n = ...)]` or a native discriminant.
-            /// Takes `&self` so variants with a payload do not need `Copy`.
+        impl #impl_generics #crate_path::Number for #name #ty_generics #where_clause {
+            type Repr = #repr_ty;
+
             #[inline]
-            #[must_use]
-            pub const fn number(&self) -> #repr_ty {
+            fn number(&self) -> #repr_ty {
                 match self { #(#number_arms,)* }
             }
-
-            /// Alias of [`Self::number`].
-            #[inline]
-            #[must_use]
-            pub const fn #as_method(&self) -> #repr_ty {
-                self.number()
-            }
-
-            #parse_impls
         }
+
+        #parse_impls
 
         #variants_impl
 
         impl #impl_generics ::core::convert::From<#name #ty_generics> for #repr_ty #where_clause {
             #[inline]
             fn from(value: #name #ty_generics) -> #repr_ty {
-                value.number()
+                #crate_path::Number::number(&value)
             }
         }
 
@@ -695,9 +677,10 @@ mod tests {
                 Io { status: String },
             }
         });
-        assert!(fielded.contains("number"));
+        assert!(fielded.contains(":: Number"));
         assert!(fielded.contains("Variant = ()"));
         assert!(!fielded.contains("from_number"));
+        assert!(!fielded.contains("FromNumber"));
         assert!(fielded.contains("NUMBERS"));
         assert_err(
             quote! { enum Mode { A } },
@@ -956,10 +939,11 @@ mod tests {
             enum Mode { A, B }
         });
         assert!(basic.contains("FromNumberError"));
+        assert!(basic.contains("FromNumber"));
+        assert!(basic.contains(":: Number"));
         assert!(!basic.contains("Self :: Error"));
+        assert!(!basic.contains("pub const fn number"));
         assert!(basic.contains("Variants"));
-        assert!(basic.contains("from_u8"));
-        assert!(basic.contains("as_u8"));
 
         ok(quote! {
             #[numbered(u8, start = 1)]

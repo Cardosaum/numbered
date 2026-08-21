@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- emit `number` / `as_*` on `numbered::Number`, not as inherent `const fn`
+- emit `from_number` on `numbered::FromNumber` (fieldless only); no
+  longer a `const fn`
+
 ## [0.3.0](https://github.com/Cardosaum/numbered/compare/numbered-macros-v0.2.0...numbered-macros-v0.3.0) - 2026-08-16
 
 ### Added
