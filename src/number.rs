@@ -38,6 +38,9 @@ macro_rules! from_number_alias {
 /// Import this trait to call `e.number()` / `e.as_u8()`. A user inherent
 /// `fn number` still compiles; use `<E as Number>::number(&e)`.
 ///
+/// Not `const`: trait methods cannot be. In const context, use
+/// [`crate::Variants::NUMBERS`].
+///
 /// [`PartialEq`](core::cmp::PartialEq) on the enum (generated) compares
 /// this number.
 pub trait Number {
@@ -68,6 +71,8 @@ pub trait Number {
 /// Parse a number into `Self`.
 ///
 /// Implemented only for fieldless enums: a number cannot rebuild a payload.
+/// Not `const`: trait methods cannot be. In const context, use
+/// [`crate::Variants::NUMBERS`].
 pub trait FromNumber: Sized {
     /// Integer type chosen in `#[numbered(<repr>)]`.
     type Repr: Copy;

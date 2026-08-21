@@ -1,7 +1,10 @@
 //! Compile-time integer numbers for enum variants.
 //!
 //! This crate gives each variant a stable integer: a `u8` (or another chosen
-//! repr) assigned at compile time. Conversion is a `match` on a literal.
+//! repr) assigned at compile time. Runtime conversion is a `match` on a
+//! literal. [`Number::number`] and [`FromNumber::from_number`] are not
+//! `const` (trait methods cannot be). In const context, use
+//! [`Variants::NUMBERS`].
 //!
 //! Downstream crates use this to drop handwritten `from_u8` / `as_u8` matches
 //! on status codes, wire tags, and similar closed integer sets.
@@ -103,14 +106,15 @@
 //! For `#[numbered(u8)]` on `E`. Nothing is inherent on `E`.
 //!
 //! - [`Number`]: `number()` / `as_u8()` (`as_*` follows the repr). Takes
-//!   `&self` so fielded variants do not need `Copy`
+//!   `&self` so fielded variants do not need `Copy`. Not `const`
 //! - [`FromNumber`]: `from_number` / `from_u8` ->
 //!   `Result<Self, FromNumberError<u8>>` (fieldless enums; a number cannot
-//!   rebuild a payload)
+//!   rebuild a payload). Not `const`
 //! - [`Variants`] (non-generic enums): `E::VARIANTS`, `E::NUMBERS`, and
 //!   `E::COUNT` after `use numbered::Variants`. Trait items, so they cannot
 //!   clash with cognomen or a user `const VARIANTS`. Fielded enums keep
-//!   `NUMBERS` / `COUNT`; `VARIANTS` is `&[()]` of that length
+//!   `NUMBERS` / `COUNT`; `VARIANTS` is `&[()]` of that length. Const use
+//!   goes through `NUMBERS`
 //! - No `Display` impl. Print the number with `e.number()`.
 //! - `From<E> for u8`, `TryFrom<u8> for E` (`TryFrom` is fieldless only)
 //! - `PartialEq<u8>` / `PartialEq<E>` both ways
@@ -165,6 +169,9 @@ pub use numbered_macros::Numbered;
 /// Fieldless enums store `Self` in [`VARIANTS`]. Fielded enums cannot
 /// build a `'static [Self]`, so [`Variant`](Self::Variant) is `()` and
 /// `VARIANTS.len()` / [`COUNT`](Self::COUNT) still match the declaration.
+///
+/// [`NUMBERS`](Self::NUMBERS) is the const-context path:
+/// [`Number::number`] cannot be `const`.
 ///
 /// ```
 /// use numbered::{Numbered, Variants};
@@ -421,6 +428,7 @@ mod tests {
         assert_eq!(Port::try_from(443u16), Ok(Port::Https));
     }
 
+    // Trait methods cannot be const. Const use goes through Variants::NUMBERS.
     const fn kind_number_in_const() -> u8 {
         Kind::NUMBERS[0]
     }

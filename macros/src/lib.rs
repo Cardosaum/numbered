@@ -38,11 +38,13 @@ use proc_macro::TokenStream;
 ///
 /// All of these are trait impls. Nothing is inherent on `E`.
 ///
-/// - `numbered::Number`: `number` / `as_u8` (`as_*` follows the repr)
-/// - `numbered::FromNumber`: `from_number` / `from_u8` (fieldless enums)
+/// - `numbered::Number`: `number` / `as_u8` (`as_*` follows the repr).
+///   Not `const` (trait methods cannot be)
+/// - `numbered::FromNumber`: `from_number` / `from_u8` (fieldless enums).
+///   Not `const`
 /// - `numbered::Variants` (non-generic enums): `VARIANTS` / `NUMBERS` /
 ///   `COUNT`. Fielded enums use `Variant = ()` so `VARIANTS.len()` still
-///   works next to cognomen extras
+///   works next to cognomen extras. Const use goes through `NUMBERS`
 /// - `From<Self> for <repr>`, `TryFrom<repr> for Self`
 /// - `PartialEq<repr>` both ways
 /// - `Serialize` / `Deserialize` (feature `serde`)

@@ -97,9 +97,9 @@ For `#[numbered(u8)]` on `E`. Nothing is inherent on `E`.
 
 | item | notes |
 |------|--------|
-| `Number` | `number()` / `as_u8()`; `&self` (`as_*` follows the repr: `as_u16`, `as_i32`, ...) |
-| `FromNumber` | `from_number` / `from_u8`; `Result<Self, FromNumberError<u8>>` (fieldless) |
-| `Variants` | `E::VARIANTS` / `E::NUMBERS` / `E::COUNT` after `use numbered::Variants` (non-generic). Trait items, so they cannot clash with cognomen |
+| `Number` | `number()` / `as_u8()`; `&self` (`as_*` follows the repr: `as_u16`, `as_i32`, ...). Not `const` |
+| `FromNumber` | `from_number` / `from_u8`; `Result<Self, FromNumberError<u8>>` (fieldless). Not `const` |
+| `Variants` | `E::VARIANTS` / `E::NUMBERS` / `E::COUNT` after `use numbered::Variants` (non-generic). Trait items, so they cannot clash with cognomen. Const use goes through `NUMBERS` |
 | `From<E> for u8`, `TryFrom<u8> for E` | `TryFrom` is fieldless; uses `core` |
 | `PartialEq<u8>` both ways | compare a variant against its number |
 | `Serialize` / `Deserialize` | feature `serde`; the number, not a string. `Deserialize` is fieldless. Do not enable serde on both Numbered and Cognomen for the same type |
